@@ -11,6 +11,13 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+async function connect() {
+    await mongoose.connect(process.env.DB_CONNECTION_STRING);
+    console.log("connected to MongoDB");
+}
+
+connect().catch(console.error)
+
 app.use('/api-beca/signup', require('./routes/signup'));
 app.use('/api-beca/signout', require('./routes/signout'));
 app.use('/api-beca/login', require('./routes/login'));
