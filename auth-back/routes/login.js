@@ -1,8 +1,10 @@
+const { getUserInfo } = require("../lib/getUserInfo");
 const { jsonResponse } = require("../lib/jsonResponse");
+const User = require("../schema/user");
 
 const router = require("express").Router();
 
-router.post("/", (req, res)=>{
+router.post("/", async (req, res)=>{
     const {username, password} = req.body;
 
     if (username === "" || password === "") {
@@ -13,21 +15,43 @@ router.post("/", (req, res)=>{
         );
     }
 
-    //Autenticar usuario
-    const accessToken = "access_token";
-    const refreshToken = "refresh_token";
-    const user = {
-        id: "1",
-        name: "Gonzalo",
-        username:"XXXXXXX",
-    };
-    res
-        .status(200)
+    const user = await User.findOne({username});
+
+    if (user) {
+        //Mediante bcrypt comprobamos si la pass ingresada es la misma que esta hasheada en la db
+        const correctPassword = await user.comparePassword(password, user.password);
+
+        if (correctPassword) {
+            //Autenticar usuario
+            const accessToken = user.createAccessToken();
+            const refreshToken =await user.refreshAccessToken();
+
+            res
+                .status(200)
+                .json(
+                    jsonResponse(200,{
+                        user: getUserInfo(user), accessToken, refreshToken
+                    })
+                );
+        }else{
+            res
+            .status(400)
+            .json(
+                jsonResponse(400,{
+                    error: "User or password incorrect"
+                })
+            )
+        }
+    }else{
+        res
+        .status(400)
         .json(
-            jsonResponse(200,{
-                user, accessToken, refreshToken
+            jsonResponse(400,{
+                error: "User not found",
+                user: null
             })
         )
+    }
 });
 
 module.exports = router;

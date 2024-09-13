@@ -2,6 +2,9 @@
 //Hook: Un hook es una función especial proporcionada por React que te permite utilizar características como el estado y el ciclo de vida en componentes funcionales, algo que anteriormente solo estaba disponible en componentes de clase.
 //Importamos hooks de react
 import { useContext, createContext, useState, useEffect } from "react";
+import { AccessTokenResponse, AuthResponse, User } from "../types/types";
+import { json } from "react-router-dom";
+import { API_URL } from "./constants";
 
 //Se define que tipo de propiedades puede recibir un componente. 
 interface AuthProviderProps{
@@ -13,12 +16,123 @@ interface AuthProviderProps{
 //Creamos nuestro contexto para establecer el valor predeterminado del contexto que, en este caso, indica que el usuario no está autenticado.
 const AuthContext = createContext({
     isAuthenticated: false,
+    getAccessToken: () => {},
+    getRefreshToken: () => {},
+    saveUser:(userData:AuthResponse)=>{},
 });
 
 //Componente que usa useContext para guardar todo el estado y las funciones que necesitamos a lo largo de la aplicacion
 export function AuthProvider({children}: AuthProviderProps) {
     //useState: utilizado para añadir estado a los componentes funcionales.
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [accessToken, setAccessToken] = useState<string>("");
+    const [user, setUser] = useState<User>();
+    //const [refreshToken, setRefreshToken] = useState<string>("");
+
+    useEffect(() =>{},[]);
+
+    //Funcion para hacer la solicitud HTTP del nuevo AccessToken
+    async function requestNewAccessToken(refreshToken:string) {
+        try{
+            const response = await fetch(`${API_URL}/refresh-token`,{
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json",
+                    Authorization: `Bearer ${refreshToken}`,
+                },
+            });
+
+            if (response.ok) {
+                const json = await response.json() as AccessTokenResponse;
+
+                if (json.error) {
+                    throw new Error(json.error);
+                }
+
+                return json.body.accessToken;
+            } else{
+                throw new Error(response.statusText);
+            }
+        }catch(error){
+            return null;
+        }
+    }
+
+    //Funcion para hacer la solicitud HTTP de los datos del usuario
+    async function getUserInfo(accessToken:string){
+        try{
+            const response = await fetch(`${API_URL}/user`,{
+                method:"GET",
+                headers:{
+                    "Content-Type":"application/json",
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+
+                if (json.error) {
+                    throw new Error(json.error);
+                }
+
+                return json;
+            } else{
+                throw new Error(response.statusText);
+            }
+        }catch(error){
+            return null;
+        }
+    }
+
+    async function checkAuth() {
+        if (accessToken) {
+            //El user esta autenticado
+        }else{
+            //El user no esta autenticado
+            const token = getRefreshToken();
+            if (token) {
+                const newAccessToken = await requestNewAccessToken(token);
+
+                if (newAccessToken) {
+                    const userInfo = await getUserInfo(newAccessToken);
+
+                    if (userInfo) {
+                        saveSessionInfo(userInfo, newAccessToken, token);
+                    }
+                }
+            }
+        }
+    }
+
+    function saveSessionInfo(userInfo: User, accessToken:string, refreshToken:string) {
+        setAccessToken(accessToken);
+                
+        setUser(userInfo);
+        
+        localStorage.setItem("token",JSON.stringify(refreshToken));
+
+        setIsAuthenticated(true);
+    }
+
+    function getAccessToken() {
+        return accessToken;
+    }
+
+    function getRefreshToken():string|null {
+        const token = localStorage.getItem("token");
+
+        if (token) {
+            const{refreshToken} = JSON.parse(token);
+            return refreshToken;
+        }
+        return null;
+    }
+
+
+    function saveUser(userData:AuthResponse) {
+        saveSessionInfo(userData.body.user, userData.body.accessToken, userData.body.refreshToken);
+    }
 
 
     /*
@@ -34,7 +148,7 @@ export function AuthProvider({children}: AuthProviderProps) {
 
 
     return(
-    <AuthContext.Provider value={{isAuthenticated}}>
+    <AuthContext.Provider value={{isAuthenticated, getAccessToken,getRefreshToken, saveUser}}>
         {children}
     </AuthContext.Provider>
     );
