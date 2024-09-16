@@ -1,6 +1,6 @@
 const Mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
-const { generateAccessToken, refreshAccessToken } = require("../auth/generateTokens");
+const { generateAccessToken, generateRefreshToken } = require("../auth/generateTokens");
 const { getUserInfo } = require("../lib/getUserInfo");
 const Token = require("../schema/token");
 
@@ -46,11 +46,12 @@ UserSchema.methods.comparePassword = async function(pass, hash) {
 UserSchema.methods.createAccessToken = function() {
     return generateAccessToken(getUserInfo(this));
 }
-UserSchema.methods.refreshAccessToken = async function() {
-    const refreshToken = refreshAccessToken(getUserInfo(this));
+
+UserSchema.methods.createRefreshToken= async function() {
+    const refreshToken = generateRefreshToken(getUserInfo(this));
 
     try {
-        await new Token({token: refreshToken});
+        await new Token({token: refreshToken}).save();
 
         return refreshToken;
     } catch (error) {

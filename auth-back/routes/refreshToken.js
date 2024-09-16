@@ -5,35 +5,33 @@ const { jsonResponse } = require("../lib/jsonResponse");
 const Token = require("../schema/token");
 
 const router = require("express").Router();
-
-router.post("/", async (req, res)=>{
+router.post("/", async (req, res, next) => {
+    /* log.info("POST /api/refresh-token"); */
     const refreshToken = getTokenFromHeader(req.headers);
 
-    if (!refreshToken) {
-        res.status(401).send(jsonResponse(401,{ error:"Unauthorized"}));
-    }
-
-    try {
-        const found = await Token.findOne({token:refreshToken});
-
+    if (refreshToken) {
+      try {
+        const found = await Token.findOne({ token: refreshToken });
+    
         if (!found) {
-            res.status(401).send(jsonResponse(401,{ error:"Unauthorized"}));
+          return res.status(403).json({ error: "Token de actualización inválido" });
         }
-
+        
         const payload = verifyRefreshToken(found.token);
 
-        if (!payload) {
-            res.status(401).send(jsonResponse(401,{ error:"Unauthorized"}));
+        if (payload) {
+          const accessToken = generateAccessToken(getUserInfo(payload.user));
+
+          return res.json(jsonResponse(200, { accessToken }));
+        }else{
+          return res.status(401).json({ error: "Unauthorized" });
         }
-
-        const accessToken = generateAccessToken(payload.user);
-
-        return res.status(200).json(200,{accessToken});
-
-
-    } catch (error) {
-        res.status(401).send(jsonResponse(401,{ error:"Unauthorized"}));
+        
+      } catch (error) {
+        return res.status(403).json({ error: "Token de actualización inválido" });
+      }
+    }else{
+      return res.status(401).json({ error: "Token de actualización no proporcionado" });
     }
-});
-
+  });
 module.exports = router;

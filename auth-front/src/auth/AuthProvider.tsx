@@ -19,6 +19,7 @@ const AuthContext = createContext({
     getAccessToken: () => {},
     getRefreshToken: () => {},
     saveUser:(userData:AuthResponse)=>{},
+    getUser:()=>({} as User|undefined),
 });
 
 //Componente que usa useContext para guardar todo el estado y las funciones que necesitamos a lo largo de la aplicacion
@@ -27,9 +28,14 @@ export function AuthProvider({children}: AuthProviderProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [accessToken, setAccessToken] = useState<string>("");
     const [user, setUser] = useState<User>();
+    const [isLoading, setIsLoading] = useState(true);
     //const [refreshToken, setRefreshToken] = useState<string>("");
 
-    useEffect(() =>{},[]);
+    useEffect(() =>{
+        
+        checkAuth();
+        console.log(getAccessToken())
+    },[]);
 
     //Funcion para hacer la solicitud HTTP del nuevo AccessToken
     async function requestNewAccessToken(refreshToken:string) {
@@ -43,7 +49,7 @@ export function AuthProvider({children}: AuthProviderProps) {
             });
 
             if (response.ok) {
-                const json = await response.json() as AccessTokenResponse;
+                const json = (await response.json()) as AccessTokenResponse;
 
                 if (json.error) {
                     throw new Error(json.error);
@@ -76,7 +82,7 @@ export function AuthProvider({children}: AuthProviderProps) {
                     throw new Error(json.error);
                 }
 
-                return json;
+                return json.body;
             } else{
                 throw new Error(response.statusText);
             }
@@ -88,6 +94,12 @@ export function AuthProvider({children}: AuthProviderProps) {
     async function checkAuth() {
         if (accessToken) {
             //El user esta autenticado
+            const userInfo = await getUserInfo(accessToken);
+            if (userInfo) {
+                saveSessionInfo(userInfo, accessToken, getRefreshToken()!);
+                setIsLoading(false);
+                return;
+            }
         }else{
             //El user no esta autenticado
             const token = getRefreshToken();
@@ -99,15 +111,19 @@ export function AuthProvider({children}: AuthProviderProps) {
 
                     if (userInfo) {
                         saveSessionInfo(userInfo, newAccessToken, token);
+                        setIsLoading(false);
+                        return;
                     }
                 }
             }
         }
+        setIsLoading(false);
     }
 
     function saveSessionInfo(userInfo: User, accessToken:string, refreshToken:string) {
         setAccessToken(accessToken);
-                
+        
+
         setUser(userInfo);
         
         localStorage.setItem("token",JSON.stringify(refreshToken));
@@ -120,11 +136,11 @@ export function AuthProvider({children}: AuthProviderProps) {
     }
 
     function getRefreshToken():string|null {
-        const token = localStorage.getItem("token");
+        const tokenData = localStorage.getItem("token");
 
-        if (token) {
-            const{refreshToken} = JSON.parse(token);
-            return refreshToken;
+        if (tokenData) {
+            const refreshToken = JSON.parse(tokenData);
+            return refreshToken
         }
         return null;
     }
@@ -132,6 +148,10 @@ export function AuthProvider({children}: AuthProviderProps) {
 
     function saveUser(userData:AuthResponse) {
         saveSessionInfo(userData.body.user, userData.body.accessToken, userData.body.refreshToken);
+    }
+
+    function getUser() {
+        return user;
     }
 
 
@@ -148,8 +168,8 @@ export function AuthProvider({children}: AuthProviderProps) {
 
 
     return(
-    <AuthContext.Provider value={{isAuthenticated, getAccessToken,getRefreshToken, saveUser}}>
-        {children}
+    <AuthContext.Provider value={{isAuthenticated, getAccessToken,getRefreshToken, saveUser, getUser}}>
+        {isLoading? <div>Loading...</div>: children}
     </AuthContext.Provider>
     );
 }

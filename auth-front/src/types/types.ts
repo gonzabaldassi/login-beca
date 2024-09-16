@@ -14,15 +14,15 @@ export interface AuthResponseError {
 
 //No guardamos el pass del lado del cliente por seguridad
 export interface User{
-    _id: string,
-    name: string,
-    username: string,
+    _id: string;
+    name: string;
+    username: string;
 }
 
 export interface AccessTokenResponse{
     statusCode: number;
     body:{
         accessToken:string;
-    }
+    };
     error ?: string;
 }

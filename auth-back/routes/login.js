@@ -24,7 +24,7 @@ router.post("/", async (req, res)=>{
         if (correctPassword) {
             //Autenticar usuario
             const accessToken = user.createAccessToken();
-            const refreshToken =await user.refreshAccessToken();
+            const refreshToken =await user.createRefreshToken();
 
             res
                 .status(200)
